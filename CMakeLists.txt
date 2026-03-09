@@ -11,41 +11,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # =============================================================================
-# 第三方依赖 - 自动克隆到 ~/.cache
+# 第三方依赖 - 通过 cmake/ 模块自动获取到 ~/.cache/thirdparty
 # =============================================================================
-
-# 获取用户 cache 目录
-if(DEFINED ENV{HOME})
-    set(USER_CACHE_DIR "$ENV{HOME}/.cache")
-else()
-    set(USER_CACHE_DIR "${CMAKE_BINARY_DIR}/.cache")
-endif()
-
-# cppjieba (中文分词) - 自动克隆到 ~/.cache/thirdparty
-set(CPPJIEBA_DIR "${USER_CACHE_DIR}/thirdparty/cppjieba")
-if(NOT EXISTS ${CPPJIEBA_DIR}/include/cppjieba/Jieba.hpp)
-    message(STATUS "Cloning cppjieba to ${CPPJIEBA_DIR}...")
-    execute_process(
-        COMMAND git clone --recursive https://github.com/yanyiwu/cppjieba.git ${CPPJIEBA_DIR}
-        RESULT_VARIABLE GIT_RESULT
-    )
-    if(NOT GIT_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to clone cppjieba")
-    endif()
-endif()
-
-# cpp-pinyin (拼音转换) - 自动克隆到 ~/.cache/thirdparty
-set(CPP_PINYIN_DIR "${USER_CACHE_DIR}/thirdparty/cpp-pinyin")
-if(NOT EXISTS ${CPP_PINYIN_DIR}/include/cpp-pinyin/Pinyin.h)
-    message(STATUS "Cloning cpp-pinyin to ${CPP_PINYIN_DIR}...")
-    execute_process(
-        COMMAND git clone https://github.com/wolfgitpr/cpp-pinyin.git ${CPP_PINYIN_DIR}
-        RESULT_VARIABLE GIT_RESULT
-    )
-    if(NOT GIT_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to clone cpp-pinyin")
-    endif()
-endif()
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cppjieba.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpp_pinyin.cmake)
 
 # =============================================================================
 # TTS Library
