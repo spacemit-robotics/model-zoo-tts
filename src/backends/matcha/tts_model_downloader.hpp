@@ -27,8 +27,8 @@ public:
     static constexpr const char* MATCHA_ZH_EN_TOKENS = "matcha-icefall-zh-en/vocab_tts.txt";
 
     // Third-party dependency repos
-    static constexpr const char* CPPJIEBA_REPO = "https://github.com/yanyiwu/cppjieba.git";
-    static constexpr const char* CPP_PINYIN_REPO = "https://github.com/wolfgitpr/cpp-pinyin.git";
+    static constexpr const char* CPPJIEBA_REPO = "https://gitee.com/spacemit-robotics/cppjieba.git";
+    static constexpr const char* CPP_PINYIN_REPO = "https://gitee.com/spacemit-robotics/cpp-pinyin.git";
 
     TTSModelDownloader();
     ~TTSModelDownloader() = default;

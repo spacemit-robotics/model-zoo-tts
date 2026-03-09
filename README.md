@@ -114,7 +114,7 @@ mkdir -p build && cd build
 cmake ..
 make -j$(nproc)
 ./bin/tts_file_demo
-./bin/tts_file_demo -p "你好世界" -l matcha_zh
+./bin/tts_file_demo -p "你好世界" -l matcha:zh
 ```
 
 **Python 文件合成：**
