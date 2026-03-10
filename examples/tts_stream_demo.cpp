@@ -22,6 +22,188 @@
 #include "tts_service.h"
 
 // =============================================================================
+// 引擎选择 (复用 tts_file_demo 的格式: matcha:zh-en, kokoro:xiaoxiao)
+// =============================================================================
+
+struct EngineSelection {
+    SpacemiT::BackendType backend;
+    std::string voice;  // Only used by Kokoro
+};
+
+// Kokoro known voices: {full_name, short_name}
+static const std::vector<std::pair<std::string, std::string>> kKokoroVoices = {
+    // Chinese female
+    {"zf_xiaobei",  "xiaobei"},
+    {"zf_xiaoni",   "xiaoni"},
+    {"zf_xiaoxiao", "xiaoxiao"},
+    {"zf_xiaoyi",   "xiaoyi"},
+    // Chinese male
+    {"zm_yunxi",    "yunxi"},
+    {"zm_yunyang",  "yunyang"},
+    {"zm_yunjian",  "yunjian"},
+    {"zm_yunfan",   "yunfan"},
+    // American English female
+    {"af_heart",    "heart"},
+    {"af_alloy",    "alloy"},
+    {"af_aoede",    "aoede"},
+    {"af_bella",    "bella"},
+    {"af_jessica",  "jessica"},
+    {"af_kore",     "kore"},
+    {"af_nicole",   "nicole"},
+    {"af_nova",     "nova"},
+    {"af_river",    "river"},
+    {"af_sarah",    "sarah"},
+    {"af_sky",      "sky"},
+    // American English male
+    {"am_adam",     "adam"},
+    {"am_echo",     "echo"},
+    {"am_eric",     "eric"},
+    {"am_fenrir",   "fenrir"},
+    {"am_liam",     "liam"},
+    {"am_michael",  "michael"},
+    {"am_onyx",     "onyx"},
+    {"am_puck",     "puck"},
+    // British English female
+    {"bf_alice",    "alice"},
+    {"bf_emma",     "emma"},
+    {"bf_isabella", "isabella"},
+    {"bf_lily",     "lily"},
+    // British English male
+    {"bm_daniel",   "daniel"},
+    {"bm_fable",    "fable"},
+    {"bm_george",   "george"},
+    {"bm_lewis",    "lewis"},
+};
+
+std::string resolveVoiceName(const std::string& input) {
+    if (input.empty()) return input;
+
+    if (input.find('_') != std::string::npos) {
+        return input;
+    }
+
+    std::vector<std::string> matches;
+    for (const auto& [full, shortname] : kKokoroVoices) {
+        if (shortname == input) {
+            matches.push_back(full);
+        }
+    }
+
+    if (matches.size() == 1) {
+        std::cout << "音色: " << input << " -> " << matches[0] << std::endl;
+        return matches[0];
+    }
+
+    if (matches.size() > 1) {
+        std::cerr << "错误: 音色名 '" << input << "' 有多个匹配:\n";
+        for (const auto& m : matches) {
+            std::cerr << "  " << m << "\n";
+        }
+        std::cerr << "请使用完整名称，如 -l kokoro:" << matches[0] << "\n";
+        exit(1);
+    }
+
+    std::cerr << "警告: 未知音色 '" << input << "'，将直接使用该名称\n";
+    return input;
+}
+
+EngineSelection parseEngine(const std::string& spec) {
+    EngineSelection sel;
+    sel.backend = SpacemiT::BackendType::MATCHA_ZH;
+
+    auto colon = spec.find(':');
+    std::string engine = (colon != std::string::npos) ? spec.substr(0, colon) : spec;
+    std::string variant = (colon != std::string::npos) ? spec.substr(colon + 1) : "";
+
+    if (engine == "matcha") {
+        if (variant.empty() || variant == "zh") {
+            sel.backend = SpacemiT::BackendType::MATCHA_ZH;
+        } else if (variant == "en") {
+            sel.backend = SpacemiT::BackendType::MATCHA_EN;
+        } else if (variant == "zh-en" || variant == "zhen") {
+            sel.backend = SpacemiT::BackendType::MATCHA_ZH_EN;
+        } else {
+            std::cerr << "错误: 未知 Matcha 变体 '" << variant << "'\n"
+                << "可用变体: zh, en, zh-en\n";
+            exit(1);
+        }
+        return sel;
+    }
+
+    if (engine == "kokoro") {
+        sel.backend = SpacemiT::BackendType::KOKORO;
+        sel.voice = resolveVoiceName(variant);
+        return sel;
+    }
+
+    // Hint for old format users
+    if (engine == "zh" || engine == "en" || engine == "zh-en" || engine == "zhen") {
+        std::cerr << "错误: 旧格式 '-l " << spec << "' 已不再支持\n"
+            << "请使用新格式: -l matcha:" << spec << "\n";
+        exit(1);
+    }
+
+    std::cerr << "错误: 未知引擎 '" << engine << "'\n"
+        << "可用引擎: matcha, kokoro\n"
+        << "用法: -l matcha:zh 或 -l kokoro:zf_xiaobei\n";
+    exit(1);
+}
+
+void printVoiceList() {
+    std::cout << "Kokoro 可用音色列表:\n"
+        << "\n"
+        << "中文女声 (zf_):\n"
+        << "  zf_xiaobei      小北 (默认)\n"
+        << "  zf_xiaoni       小妮\n"
+        << "  zf_xiaoxiao     小小\n"
+        << "  zf_xiaoyi       小一\n"
+        << "\n"
+        << "中文男声 (zm_):\n"
+        << "  zm_yunxi        云希\n"
+        << "  zm_yunyang      云阳\n"
+        << "  zm_yunjian      云健\n"
+        << "  zm_yunfan       云帆\n"
+        << "\n"
+        << "美式英语女声 (af_):\n"
+        << "  af_heart        Heart\n"
+        << "  af_alloy        Alloy\n"
+        << "  af_aoede        Aoede\n"
+        << "  af_bella        Bella\n"
+        << "  af_jessica      Jessica\n"
+        << "  af_kore         Kore\n"
+        << "  af_nicole       Nicole\n"
+        << "  af_nova         Nova\n"
+        << "  af_river        River\n"
+        << "  af_sarah        Sarah\n"
+        << "  af_sky          Sky\n"
+        << "\n"
+        << "美式英语男声 (am_):\n"
+        << "  am_adam         Adam\n"
+        << "  am_echo         Echo\n"
+        << "  am_eric         Eric\n"
+        << "  am_fenrir       Fenrir\n"
+        << "  am_liam         Liam\n"
+        << "  am_michael      Michael\n"
+        << "  am_onyx         Onyx\n"
+        << "  am_puck         Puck\n"
+        << "\n"
+        << "英式英语女声 (bf_):\n"
+        << "  bf_alice        Alice\n"
+        << "  bf_emma         Emma\n"
+        << "  bf_isabella     Isabella\n"
+        << "  bf_lily         Lily\n"
+        << "\n"
+        << "英式英语男声 (bm_):\n"
+        << "  bm_daniel       Daniel\n"
+        << "  bm_fable        Fable\n"
+        << "  bm_george       George\n"
+        << "  bm_lewis        Lewis\n"
+        << "\n"
+        << "用法: -l kokoro:<voice>  支持短名 (xiaobei) 和全名 (zf_xiaobei)\n"
+        << std::endl;
+}
+
+// =============================================================================
 // 音频处理工具
 // =============================================================================
 
@@ -273,11 +455,11 @@ void synthesisThread(SpacemiT::TtsEngine& engine,
 // 播放线程
 // =============================================================================
 
-void playbackThread(AudioQueue& queue, bool enable_play, int output_rate, int channels) {
+void playbackThread(AudioQueue& queue, bool enable_play, int output_rate, int channels, int device_index) {
     std::unique_ptr<SpaceAudio::AudioPlayer> player;
 
     if (enable_play) {
-        player = std::make_unique<SpaceAudio::AudioPlayer>(-1);
+        player = std::make_unique<SpaceAudio::AudioPlayer>(device_index);
         if (!player->Start(output_rate, channels)) {
             std::cerr << "[播放] 启动播放器失败" << std::endl;
             enable_play = false;
@@ -353,22 +535,40 @@ void printUsage(const char* program) {
         << "\n"
         << "选项:\n"
         << "  -p <text>         自定义文本\n"
-        << "  -l <lang>         语言: zh, en, zh-en (默认)\n"
+        << "  -e <engine>       引擎选择 (格式: 引擎:变体)\n"
+        << "                    matcha:zh / matcha:en / matcha:zh-en (默认)\n"
+        << "                    kokoro / kokoro:<voice>\n"
+        << "  -o <device>       输出设备索引 (-1 为默认)\n"
+        << "  -l, --list        列出可用音频输出设备\n"
         << "  --output-rate <N> 输出采样率 (默认: 48000)\n"
         << "  --channels <N>    输出声道数: 1=单声道, 2=双声道 (默认: 1)\n"
         << "  --no-play         不播放音频\n"
         << "  --delay <ms>      模拟 LLM 输出延迟 (默认: 5 ms/字符)\n"
+        << "  --list-voices     列出 Kokoro 可用音色\n"
         << "  -h                显示帮助\n"
+        << "\n"
+        << "示例:\n"
+        << "  " << program << " -l                              # 列出输出设备\n"
+        << "  " << program << " -p \"你好\" -e matcha:zh           # 中文合成\n"
+        << "  " << program << " -p \"你好\" -e kokoro:xiaoxiao     # Kokoro 音色\n"
+        << "  " << program << " -o 0 -p \"你好\"                   # 指定输出设备 0\n"
         << std::endl;
 }
 
-SpacemiT::BackendType parseLanguage(const std::string& lang) {
-    if (lang == "en") {
-        return SpacemiT::BackendType::MATCHA_EN;
-    } else if (lang == "zh") {
-        return SpacemiT::BackendType::MATCHA_ZH;
+void listOutputDevices() {
+    std::cout << "可用音频输出设备:" << std::endl;
+    std::cout << "==================" << std::endl;
+
+    auto devices = SpaceAudio::AudioPlayer::ListDevices();
+
+    if (devices.empty()) {
+        std::cout << "  未找到设备!" << std::endl;
+    } else {
+        for (const auto& [index, name] : devices) {
+            std::cout << "  [" << index << "] " << name << std::endl;
+        }
     }
-    return SpacemiT::BackendType::MATCHA_ZH_EN;
+    std::cout << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -384,21 +584,30 @@ int main(int argc, char* argv[]) {
         "未来，AI将会更加intelligent，更加helpful。"
         "让我们一起期待这个exciting的未来吧！";
 
-    std::string language = "zh-en";
+    std::string engine_spec = "matcha:zh-en";
     bool enable_play = true;
     int delay_ms = 5;  // 默认 5ms/字符，可用 --delay 0 禁用
     int output_rate = 48000;  // 输出采样率
     int channels = 1;  // 输出声道数
+    int output_device = -1;  // 输出设备索引
 
     // 解析参数
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printUsage(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--list") == 0) {
+            listOutputDevices();
+            return 0;
+        } else if (strcmp(argv[i], "--list-voices") == 0) {
+            printVoiceList();
+            return 0;
         } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
             text = argv[++i];
-        } else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc) {
-            language = argv[++i];
+        } else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
+            engine_spec = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            output_device = std::stoi(argv[++i]);
         } else if (strcmp(argv[i], "--no-play") == 0) {
             enable_play = false;
         } else if (strcmp(argv[i], "--delay") == 0 && i + 1 < argc) {
@@ -414,16 +623,32 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto backend = parseLanguage(language);
-    int sample_rate = (backend == SpacemiT::BackendType::MATCHA_ZH_EN) ? 16000 : 22050;
+    auto selection = parseEngine(engine_spec);
+
+    int sample_rate;
+    switch (selection.backend) {
+        case SpacemiT::BackendType::MATCHA_ZH:
+        case SpacemiT::BackendType::MATCHA_EN:
+            sample_rate = 22050;
+            break;
+        case SpacemiT::BackendType::MATCHA_ZH_EN:
+            sample_rate = 16000;
+            break;
+        case SpacemiT::BackendType::KOKORO:
+            sample_rate = 24000;
+            break;
+        default:
+            sample_rate = 22050;
+    }
 
     std::cout << "============================================" << std::endl;
     std::cout << "        流式 TTS 演示程序" << std::endl;
     std::cout << "============================================" << std::endl;
-    std::cout << "语言: " << language << std::endl;
+    std::cout << "引擎: " << engine_spec << std::endl;
     std::cout << "模型采样率: " << sample_rate << " Hz" << std::endl;
     std::cout << "输出采样率: " << output_rate << " Hz" << std::endl;
     std::cout << "输出声道: " << channels << std::endl;
+    std::cout << "输出设备: " << (output_device == -1 ? "默认" : std::to_string(output_device)) << std::endl;
     std::cout << "播放: " << (enable_play ? "是" : "否") << std::endl;
     std::cout << "LLM 延迟: " << delay_ms << " ms/字符" << std::endl;
     std::cout << "============================================" << std::endl;
@@ -433,8 +658,12 @@ int main(int argc, char* argv[]) {
     std::cout << "初始化 TTS 引擎..." << std::endl;
 
     SpacemiT::TtsConfig config;
-    config.backend = backend;
+    config.backend = selection.backend;
     config.sample_rate = sample_rate;
+
+    if (selection.backend == SpacemiT::BackendType::KOKORO && !selection.voice.empty()) {
+        config.voice = selection.voice;
+    }
 
     SpacemiT::TtsEngine engine(config);
     if (!engine.IsInitialized()) {
@@ -461,7 +690,7 @@ int main(int argc, char* argv[]) {
 
     // 启动播放线程
     std::thread player_thread(playbackThread, std::ref(audio_queue),
-            enable_play, output_rate, channels);
+            enable_play, output_rate, channels, output_device);
 
     // 启动合成线程
     std::thread synthesis_thread(synthesisThread, std::ref(engine),

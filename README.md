@@ -45,7 +45,7 @@ cmake -B build -S . \
 
 **可选：**
 - **Python 绑定**：`pip install pybind11` 或 `apt install python3-pybind11`
-- **流式示例（C++）**：需 audio 组件 + PortAudio，`apt install portaudio19-dev`，构建时 `cmake .. -DBUILD_STREAM_DEMO=ON`
+- **流式示例（C++）**：需 audio 组件 + PortAudio，`apt install portaudio19-dev`。SDK 编译时默认开启
 
 ### 2.2. 下载模型
 
@@ -87,7 +87,7 @@ mm
 **C++ 简单合成：**
 ```bash
 tts_file_demo
-tts_file_demo -p "你好世界" -l matcha_zh
+tts_file_demo -p "你好世界" -l matcha:zh
 ```
 
 **Python 文件合成**（需已安装 Python 包或设置 PYTHONPATH 指向 SDK 构建产物）：
@@ -95,10 +95,12 @@ tts_file_demo -p "你好世界" -l matcha_zh
 python python/examples/tts_file_demo.py
 ```
 
-**流式合成**（若 SDK 构建时已开启流式示例）：
+**流式合成**（SDK 编译时默认已开启）：
 ```bash
 tts_stream_demo -p "自定义文本"
-tts_stream_demo -l zh-en --no-play
+tts_stream_demo -e matcha:zh-en --no-play
+tts_stream_demo -l              # 列出可用音频设备
+tts_stream_demo -o 1            # 指定输出设备
 ```
 
 Python 流式示例：`python python/examples/tts_stream_demo.py --no-play` / `-p "自定义文本"`（需已安装 `space_audio`）。
@@ -123,21 +125,6 @@ make -C build tts-install-python   # 或设置 PYTHONPATH
 python python/examples/tts_file_demo.py
 ```
 
-**流式合成（默认未开启）**：若需测试 C++ 流式合成，需先安装 PortAudio（见 2.1 可选依赖），然后开启流式示例并重新构建、运行：
-```bash
-cd build
-cmake .. -DBUILD_STREAM_DEMO=ON
-make -j$(nproc)
-./bin/tts_stream_demo -p "自定义文本"
-./bin/tts_stream_demo -l zh-en --no-play
-```
-
-Python 流式示例无需额外编译选项，安装 `space_audio` 后直接运行：
-```bash
-python python/examples/tts_stream_demo.py --no-play
-python python/examples/tts_stream_demo.py -p "自定义文本。测试一下。"
-```
-
 ## 3. 应用开发
 
 本章说明如何在自有工程中**集成 TTS 并调用 API**。环境与依赖见 [2.1](#21-安装依赖)，模型准备见 [2.2](#22-下载模型)，编译与运行示例见 [2.3](#23-测试)。
@@ -152,7 +139,7 @@ python python/examples/tts_stream_demo.py -p "自定义文本。测试一下。"
 | `build/lib/libtts.a` | C++ 核心库，链接时使用 |
 | `build/python/spacemit_tts/` | Python 包，`make tts-install-python` 安装后 `import spacemit_tts` |
 
-示例可执行文件（非集成必需）：`build/bin/tts_file_demo`、`build/bin/tts_stream_demo`（需 `-DBUILD_STREAM_DEMO=ON`）。运行与验证步骤见 [2.3.1](#231-在-sdk-中验证) 或 [2.3.2](#232-独立构建下验证)。
+示例可执行文件（非集成必需）：`build/bin/tts_file_demo`、`build/bin/tts_stream_demo`。运行与验证步骤见 [2.3.1](#231-在-sdk-中验证) 或 [2.3.2](#232-独立构建下验证)。
 
 ### 3.2. API 使用
 
