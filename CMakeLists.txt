@@ -250,7 +250,16 @@ install(TARGETS tts
 # 用法: cmake .. -DBUILD_STREAM_DEMO=ON
 #
 option(BUILD_SIMPLE_DEMO "Build TTS file/simple demo" ON)
-option(BUILD_STREAM_DEMO "Build TTS stream demo (requires audio component + PortAudio)" OFF)
+
+# 检测是否在 SDK 仓库中编译
+set(_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+if(EXISTS "${_SDK_ROOT}/build/envsetup.sh")
+    set(_IN_SDK_BUILD ON)
+else()
+    set(_IN_SDK_BUILD OFF)
+endif()
+
+option(BUILD_STREAM_DEMO "Build TTS stream demo (requires audio component + PortAudio)" ${_IN_SDK_BUILD})
 
 if(BUILD_SIMPLE_DEMO)
     add_executable(tts_file_demo examples/tts_file_demo.cpp)
@@ -261,52 +270,50 @@ endif()
 
 # 流式 TTS 演示程序 (需要 space_audio / portaudio)
 if(BUILD_STREAM_DEMO)
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(PORTAUDIO QUIET portaudio-2.0)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
+    pkg_check_modules(SAMPLERATE samplerate)
+
+    find_library(SPACE_AUDIO_LIB space_audio)
+    find_library(AUDIO_RESAMPLER_LIB audio_resampler)
+    find_path(SPACE_AUDIO_INC audio_base.hpp)
+
+    if(NOT SPACE_AUDIO_LIB OR NOT AUDIO_RESAMPLER_LIB OR NOT SPACE_AUDIO_INC)
+        message(FATAL_ERROR
+            "BUILD_STREAM_DEMO=ON but audio component not found!\n"
+            "Install audio component first, or disable with -DBUILD_STREAM_DEMO=OFF")
     endif()
 
-    if(PORTAUDIO_FOUND)
-        # space_audio 源文件路径
-        set(SPACE_AUDIO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../audio)
+    find_package(Threads REQUIRED)
 
-        if(EXISTS ${SPACE_AUDIO_DIR}/src/space_audio.cpp)
-            add_executable(tts_stream_demo
-                examples/tts_stream_demo.cpp
-                ${SPACE_AUDIO_DIR}/src/space_audio.cpp
-                ${SPACE_AUDIO_DIR}/src/audio_stream.cpp
-                ${SPACE_AUDIO_DIR}/src/resampler.cpp
-                ${SPACE_AUDIO_DIR}/src/resampler_rvv.cpp
-            )
+    add_executable(tts_stream_demo examples/tts_stream_demo.cpp)
 
-            target_include_directories(tts_stream_demo PRIVATE
-                ${SPACE_AUDIO_DIR}/inc
-                ${PORTAUDIO_INCLUDE_DIRS}
-            )
+    target_include_directories(tts_stream_demo PRIVATE
+        ${SPACE_AUDIO_INC}
+        ${PORTAUDIO_INCLUDE_DIRS}
+    )
 
-            target_include_directories(tts_stream_demo PRIVATE
-                ${SPACE_AUDIO_DIR}/inc/internal
-            )
+    target_link_libraries(tts_stream_demo PRIVATE
+        tts
+        ${SPACE_AUDIO_LIB}
+        ${AUDIO_RESAMPLER_LIB}
+        ${PORTAUDIO_LIBRARIES}
+        ${SAMPLERATE_LIBRARIES}
+        Threads::Threads
+    )
+    target_link_directories(tts_stream_demo PRIVATE
+        ${PORTAUDIO_LIBRARY_DIRS}
+        ${SAMPLERATE_LIBRARY_DIRS}
+    )
 
-            target_link_libraries(tts_stream_demo PRIVATE
-                tts
-                ${PORTAUDIO_LIBRARIES}
-                Threads::Threads
-            )
-            target_link_directories(tts_stream_demo PRIVATE ${PORTAUDIO_LIBRARY_DIRS})
-
-            find_package(Threads REQUIRED)
-
-            set_target_properties(tts_stream_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-            install(TARGETS tts_stream_demo RUNTIME DESTINATION bin)
-
-            message(STATUS "[tts] tts_stream_demo enabled")
-        else()
-            message(FATAL_ERROR "BUILD_STREAM_DEMO=ON but audio component not found. Set AUDIO_DIR or disable with -DBUILD_STREAM_DEMO=OFF")
-        endif()
-    else()
-        message(FATAL_ERROR "BUILD_STREAM_DEMO=ON but PortAudio not found. apt install portaudio19-dev or disable with -DBUILD_STREAM_DEMO=OFF")
+    if(SAMPLERATE_FOUND)
+        target_compile_definitions(tts_stream_demo PRIVATE USE_LIBSAMPLERATE)
     endif()
+
+    set_target_properties(tts_stream_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    install(TARGETS tts_stream_demo RUNTIME DESTINATION bin)
+
+    message(STATUS "[tts] tts_stream_demo enabled")
 else()
     message(STATUS "[tts] tts_stream_demo disabled (BUILD_STREAM_DEMO=OFF)")
 endif()
