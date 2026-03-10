@@ -98,9 +98,8 @@ python python/examples/tts_file_demo.py
 **流式合成**（SDK 编译时默认已开启）：
 ```bash
 tts_stream_demo -p "自定义文本"
-tts_stream_demo -e matcha:zh-en --no-play
-tts_stream_demo -l              # 列出可用音频设备
-tts_stream_demo -o 1            # 指定输出设备
+tts_stream_demo -l # 查看设备
+tts_stream_demo --output 48000 --channels 2 -e matcha:zh-en # 默认流式tts体验
 ```
 
 Python 流式示例：`python python/examples/tts_stream_demo.py --no-play` / `-p "自定义文本"`（需已安装 `space_audio`）。
